@@ -24,7 +24,7 @@ function test:ctor()
 	self.scale_1 = 0.9
 	self.scale_2 = 0.7
 	self.itemList = {}
-	self.index = 0                   --偏移量
+	self.index = 1                   --当前指向
 	self.touchBeginPosition = {}
 	self.state = FREE  
 	--层触摸事件
@@ -136,30 +136,28 @@ end
 function test:init_()
 	print("=-=======count",#self.itemList)
 	--初始化中心
-	for i=1,6 do
+	for i=1,#self.itemList do
 		local item = self.itemList[i]
+		item.index = i
 		item:setTouchEnabled(false)
-		local x = (i - 3) * self.interval_width_1
-		local y = (i - 3) * self.interval_height_1
+		local x = (i - 4) * self.interval_width_1
+		local y = (i - 4) * self.interval_height_1
 		item:setPosition(cc.p(x,y))
-		item:setScale( 1 - math.abs(i-3) * 0.1 )
-		self:addChild(item, -math.abs(i-3) + 3)
-		if i > 5 then
+		item:setScale(self:getNextScale(i))
+		self:addChild(item)
+		if i ==1 or i > 6 then
 			item:setScale(0)
-			item:setZOrder(100)
 		end
 	end
+	self:orderReSet()
 end
-function test:test()
-	local item = ccui.Button:create("book.png","","")
-	--item:setScale(0)
-	item:setPosition(cc.p(0,0))
-    local function event(sender,event)
-        print("=========touch",i)
-    end
-    item:addTouchEventListener(event)
-    --self:addChild(item)
-    self:moveDown(item,0)
+function test:test(direction)
+	for i=1,6 do
+		local item = self:getItemByIndex(i)
+		print("=====item index",item.index)
+	end
+	print("================")
+	self:indexMove(direction)
 end
 function test:getWeight()
 
@@ -167,66 +165,92 @@ end
 function test:getHeight()
 
 end
-function test:indexMove()
-	self.index = self.index + 1
-	if self.index > #self.itemList then
-		self.index = 1
+function test:indexMove(direction) 
+	self.index = (self.index - direction) % #self.itemList
+	if self.index == 0  then
+		self.index = #self.itemList
 	end
 end
 --子控件移动
 function test:itemMove(direction)
-	for i=0,5 do
+	--一次移动表现完，当前item列表指向下标向左右移动
+	self:indexMove(direction)
+	print("=========当前指向",self.index)
+	for i=1,7 do
 		local item = self:getItemByIndex(i)
 		self:move(item, i, direction)
 	end
 end
 function test:move(item,index,direction)
-	--print("====item",index,item)
-	if index == 0 then
-		item:setPosition(cc.p(-200,100))
-		print("========scale1",item:getScale())
+	print("==========before scale",item:getScale(),item.index)
+	--处理无需操作的item
+	if index == 7 and direction == DLEFT then
+		return 
+	elseif index == 1 and direction == DRIGHT then
+		return
 	end
-	local scale_ = cc.ScaleTo:create(1, self:getNextScale(index + 1))
-	if index == 0 then
-		print("========scale2",self:getNextScale(index + 1))
+	--变换位置
+	if index == 1 and direction == DLEFT then
+		item:setPosition(cc.p(-300,150))
+		--print("========scale1",item:getScale())
+	elseif index == 7 and direction == DRIGHT then 
+		item:setPosition(cc.p(300,-150))
 	end
+	
+	local scale_ = cc.ScaleTo:create(1, self:getNextScale(index))
 	local moveby_ = cc.MoveBy:create(1, cc.p(direction * self.interval_width_1, direction * self.interval_height_1))
 	local function setState()
+		--print("======set")
 		self.state = FREE
+		print("==========after scale",item:getScale(),item.index,item:getLocalZOrder())
+		self:orderReSet()
 	end
 	local seq = cc.Sequence:create(scale_,cc.CallFunc:create(setState))
-	
+	--print("======move index",item.index)
 	item:runAction(seq)
 	item:runAction(moveby_)
 end
 --根据下标获取对应item
 function test:getItemByIndex(index)
-	if index > 5 then
-		return
-	end
+	index = (index + self.index - 1) % #self.itemList  
+	--回到原点
 	if index == 0 then
-		if #self.itemList > 5 then
-			print("=====cur",#self.itemList)
-			return self.itemList[#self.itemList]
-		end
-	else
-		return self.itemList[index + self.index]
+		return self.itemList[#self.itemList]
 	end
-
+	--当环小于6时
+	if #self.itemList < 6 then
+		if index > #self.itemList then
+			return nil
+		end
+	end
+	return self.itemList[index]
 end
 --获取下一个位置的缩放比例
 function test:getNextScale(index)
-	if index == 1 or index == 5 then
-		return S_1
-	elseif index == 2 or index == 4 then
-		return S_2
-	elseif index == 3 then
-		return S_3
-	elseif index == 0 or index == 6 then
+	-- local S_1 = 0.7 		
+	-- local S_2 = 0.9
+	-- local S_3 = 1
+	-- local S_4 = 0
+
+	if index == 1 or index == 7 then
 		return S_4
+	elseif index == 2 or index == 6 then
+		return S_1
+	elseif index == 3 or index == 5 then
+		return S_2
+	elseif index == 4 then
+		return S_3
 	end
+	
 end
 function test:getNextPosition()
+end
+--层级重排
+function test:orderReSet()
+	for i=1,7 do
+		local item = self.itemList[i]
+		item:setLocalZOrder(-math.abs(i-4) + 5)
+	end
 end
 function test:onTouchBegan(touch,event)
 	--如果触摸点在item中，不反应
@@ -248,17 +272,18 @@ function test:onTouchEnded(touch, event)
 	-- if self:isValid(touch:getLocation()) then
 	-- 	return
 	-- end
-	if self:checkDirection(self.touchBeginPosition, touch:getLocation()) == DCENTER then
-		--激活按钮事件
-		--判断是否在中心按钮]
-		local item = self.itemList[CENTER]
-		local contentSize = item:getContentSize()
-		local center = {}
-		center.x,center.y = item:getPosition()
-		if(self:isInside(touch:getLocation(),center,contentSize)) then 
-			print("激活按钮事件=========")
-		end
-	end
+	-- if self:checkDirection(self.touchBeginPosition, touch:getLocation()) == DCENTER then
+	-- 	--激活按钮事件
+	-- 	--判断是否在中心按钮]
+	-- 	local item = self.itemList[CENTER]
+	-- 	local contentSize = item:getContentSize()
+	-- 	local center = {}
+	-- 	center.x,center.y = item:getPosition()
+	-- 	if(self:isInside(touch:getLocation(),center,contentSize)) then 
+	-- 		print("激活按钮事件=========")
+	-- 	end
+	-- end
+	--self:test(self:checkDirection(self.touchBeginPosition, touch:getLocation()))
 end
 function test:update_()
 
@@ -290,9 +315,9 @@ function test:isValid(target)
 end
 --判断触摸点在不在矩形内
 function test:isInside(target,center,contentSize)
-	print("========= t1,t2",target.x,target.y)
-	print("========= x1,x2",center.x - contentSize.width /2,center.x + contentSize.width /2)
-	print("========= y1 y2",center.y - contentSize.height / 2,center.y + contentSize.height / 2)
+	-- print("========= t1,t2",target.x,target.y)
+	-- print("========= x1,x2",center.x - contentSize.width /2,center.x + contentSize.width /2)
+	-- print("========= y1 y2",center.y - contentSize.height / 2,center.y + contentSize.height / 2)
 	if target.x >= center.x - contentSize.width /2 and target.x <= center.x + contentSize.width /2 
 		and target.y >= center.y - contentSize.height / 2 and target.y <= center.y + contentSize.height / 2 then
 		print("====inside")
