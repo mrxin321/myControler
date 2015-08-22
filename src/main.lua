@@ -33,14 +33,17 @@ local function main()
     local layer = cc.Layer:create()
     local sceneGame =  cc.Scene:create()
     sceneGame:addChild(layer)  
+
+   
     --测试
-    local test = require("test.test"):create()
+    local test = require("test.test2"):create()
     test:setPosition(cc.p(320,480))
-    print("=======myListView",test:getAnchorPoint())
+    test:test()
     --添加子item
-    for i=1,6 do
+    for i=1,1 do 
         local str = string.format("book_%s.png",i)
         local item = ccui.Button:create(str,"","")
+        item.index = i
         local function event(sender,event)
             print("=========touch",i)
         end
@@ -49,7 +52,26 @@ local function main()
     end
     test:init_()
     --测试
-    --test:test()
+    -- local button = ccui.Button:create("menu1.png","","")
+    -- button:setPosition(cc.p(480,320))
+    -- layer:addChild(button)
+    -- local function event(sender,event)
+    --     if event == ccui.TouchEventType.ended then
+    --         test:testMoveRight()
+    --     end
+    -- end 
+    -- button:addTouchEventListener(event)
+
+    -- local button2 = ccui.Button:create("menu1.png","","")
+    -- button2:setPosition(cc.p(400,320))
+    -- layer:addChild(button2)
+    -- local function event2(sender,event)
+    --     if event == ccui.TouchEventType.ended then
+    --         test:testMoveLeft()
+    --     end
+    -- end 
+    -- button2:addTouchEventListener(event2)
+
     layer:addChild(test)
 
     if cc.Director:getInstance():getRunningScene() then

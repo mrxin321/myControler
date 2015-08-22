@@ -134,6 +134,16 @@ function test:addItem_(item)
 end
 --初始化item
 function test:init_()
+
+	--如果子item不足6个，补足到6个
+	if #self.itemList < 6 then
+		
+		for i=#self.itemList + 1,6 do
+			print("======补足",i)
+			table.insert(self.itemList, ccui.Button:create())
+		end
+	end
+	print("-======总数:",#self.itemList)
 	self.index = #self.itemList
 	print("=-=======count",#self.itemList)
 	--初始化中心
@@ -143,7 +153,7 @@ function test:init_()
 		local x = (i - 4) * self.interval_width_1
 		local y = (i - 4) * self.interval_height_1
 		item:setPosition(cc.p(x,y))
-		item:setScale(self:getNextScale(i))
+		item:setScale(self:getScale_(i))
 		self:addChild(item)
 		if i ==1 or i > 6 then
 			item:setScale(0)
@@ -177,10 +187,11 @@ function test:testMoveLeft()
 	self:testShow()
 	self.index = self.index - 1 
 end
-function test:getNextIndex(index)
-	index = index % #self.list
+--获取在环中的位置
+function test:getIndexInLoop(index)
+	index = index % #self.itemList
 	if index == 0 then
-		index = #self.list
+		index = #self.itemList
 	end
 	return index
 end
@@ -192,7 +203,7 @@ function test:testShow()
 	-- 	print("=====value:",v) 
 	-- end
 	for i=0,6 do
-		local index = self:getNextIndex(self.index + i)
+		local index = self:getIndexInLoop(self.index + i)
 		print("========value:",self.list[index])
 	end
 end
@@ -212,15 +223,28 @@ end
 function test:itemMove(direction)
 	--一次移动表现完，当前item列表指向下标向左右移动
 	print("=========当前指向",self.index)
-	for i=1,7 do
-		local item = self:getItemByIndex(i)
-		if i == #self.itemList then
-			self:move(item, i, direction,true)
-		else
-			self:move(item, i, direction)
+	for i=0,5 do
+		local index = self:getIndexInLoop(self.index + i) 
+		local item = self:getItemByIndex(index)
+
+		--变换位置
+		if index == 0 and direction == DLEFT then
+			print("set======7")
+			item:setPosition(cc.p(300,-150))
+		elseif index == 0 and direction == DRIGHT then 
+			print("set======1")
+			item:setPosition(cc.p(-300,150)) 
 		end
-		
+
+		local x,y = self.interval_width_1 * direction,self.interval_height_1 * direction
+		local scale = self:getScale_(i + 1)
+		if i == #self.itemList - 1 then
+			self:move(i,item, scale, x , y ,true)
+		else
+			self:move(i,item, scale, x , y)
+		end
 	end
+	self:indexMove(direction)
 end
 function test:moveLeft()
 	--位置1的item变化position
@@ -231,61 +255,39 @@ end
 function test:moveRight()
 
 end
-function test:move(item,index,direction,isCallBack)
+--移动函数
+--@item 		 要移动的item
+--@x,y  		 偏移量
+--@isCallBack    是否执行回调函数 
+--@scale         缩放值
+function test:move(index,item,scale,x,y,isCallBack)
+	--print(""..index.."个".."scale:"..scale)
+	print("",index,item.index,scale)
 	if item == nil  then
 		return 
 	end
-	--变换位置
-	if index == 7 and direction == DLEFT then
-		print("set======7")
-		item:setPosition(cc.p(300,-150))
-	elseif index == 1 and direction == DRIGHT then 
-		print("set======1")
-		item:setPosition(cc.p(-300,150)) 
-	end
 
-	local scale_ = cc.ScaleTo:create(0.5, self:getNextScale(index + direction ))
-	print("我是第"..index.."个".."我要变化到"..self:getNextScale(index + direction))
-	local moveby_ = cc.MoveBy:create(0.5, cc.p(direction * self.interval_width_1, direction * self.interval_height_1))
+	local scale_ = cc.ScaleTo:create(0.5, scale)
+	local moveby_ = cc.MoveBy:create(0.5, cc.p(x, y))
 	
 	if isCallBack  == true then
-
 		local function setState()
-			
-			-- print("==========after scale",item.index,item:getLocalZOrder(),item:getScale())
 			self.state = FREE
-			self:indexMove(direction)
 			self:orderReSet()
-			for i=1,#self.itemList do
-				local item_ = self:getItemByIndex(i)
-				print("==========state",i,item_.index,item_:getLocalZOrder(),item_:getScale(),item:isVisible())
-			end
 		end
 		local seq = cc.Sequence:create(scale_,cc.DelayTime:create(0.01),cc.CallFunc:create(setState))
 		item:runAction(seq)
 	else
 		item:runAction(scale_)
 	end
-	
 	item:runAction(moveby_)
 end
 --根据下标获取对应item
 function test:getItemByIndex(index)
-	index = (index + self.index - 1) % #self.itemList  
-	--回到原点
-	if index == 0 then
-		return self.itemList[#self.itemList]
-	end
-	--当环小于6时
-	if #self.itemList < 6 then
-		if index > #self.itemList then
-			return nil
-		end
-	end
 	return self.itemList[index]
 end
---获取下一个位置的缩放比例
-function test:getNextScale(index)
+--获取当前位置的缩放比例
+function test:getScale_(index)
 	-- local S_1 = 0.7 		
 	-- local S_2 = 0.9
 	-- local S_3 = 1
@@ -301,11 +303,17 @@ function test:getNextScale(index)
 	end
 	return 0
 end
-function test:getNextPosition()
+--获取当前位置的偏移量
+function test:getPosition_(index)
+	--0位置
+	if index == 0 or index > 5 then
+		return 0,0
+	end
+	return math.abs(index - 4) * interval_width_1, math.abs(index - 4) * interval_height_1
 end
 --层级重排
 function test:orderReSet()
-	for i=1,7 do
+	for i=1,6 do
 		local item = self:getItemByIndex(i)
 		item:setLocalZOrder(-math.abs(i-4) + 5)
 	end
