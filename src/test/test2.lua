@@ -27,6 +27,7 @@ function test:ctor()
 	self.index = -1                   --当前指向
 	self.touchBeginPosition = {}
 	self.state = FREE  
+	self.direction = -1
 	--层触摸事件
 	local function onTouchBegan(touch, event)
 		return self:onTouchBegan(touch, event)
@@ -150,20 +151,20 @@ function test:init_()
 	for i=1,#self.itemList do
 		local item = self:getItemByIndex(i)
 		item:setTouchEnabled(false)
-		local x = (i - 4) * self.interval_width_1
-		local y = (i - 4) * self.interval_height_1
+		local x = (i - 3) * self.interval_width_1
+		local y = (i - 3) * self.interval_height_1
 		item:setPosition(cc.p(x,y))
 		item:setScale(self:getScale_(i))
 		self:addChild(item)
-		if i ==1 or i > 6 then
-			item:setScale(0)
+		if i > 5 then
+			item:setScale(0) 
 			item:setLocalZOrder(1)
 		end
 	end
 	self:orderReSet()
 	for i=1,#self.itemList do
 		local item_ = self:getItemByIndex(i)
-		print("==========init() scale",item_.index,item_:getLocalZOrder(),item_:getScale())
+		print("=========info",item_.index,item_:getLocalZOrder(),item_:getScale())
 	end
 
 	print("=========当前指向",self.index)
@@ -214,37 +215,38 @@ function test:getHeight()
  
 end
 function test:indexMove(direction) 
-	self.index = (self.index - direction) % 7
+	self.index = (self.index - direction) % #self.itemList
 	if self.index == 0  then
 		self.index = #self.itemList
 	end
+	print("========xin",self.index)
 end
 --子控件移动
-function test:itemMove(direction)
-	--一次移动表现完，当前item列表指向下标向左右移动
-	print("=========当前指向",self.index)
+function test:itemMove()
+	local direction = self.direction
 	for i=0,5 do
 		local index = self:getIndexInLoop(self.index + i) 
 		local item = self:getItemByIndex(index)
 
 		--变换位置
-		if index == 0 and direction == DLEFT then
-			print("set======7")
+		if i == 0 and direction == DLEFT then
+			print("=========item value left",item.index)
 			item:setPosition(cc.p(300,-150))
-		elseif index == 0 and direction == DRIGHT then 
-			print("set======1")
+		elseif i == 0 and direction == DRIGHT then 
+			print("=========item value right",item.index)
 			item:setPosition(cc.p(-300,150)) 
 		end
 
 		local x,y = self.interval_width_1 * direction,self.interval_height_1 * direction
-		local scale = self:getScale_(i + 1)
-		if i == #self.itemList - 1 then
-			self:move(i,item, scale, x , y ,true)
+		local scale = self:getScale_(i + direction)
+		if #self.itemList > 6 and i == 5   then
+			self:move(i,item, scale, x , y,direction,true)
+		elseif #self.itemList <= 6 and i == #self.itemList - 1 then
+			self:move(i,item, scale, x , y,direction,true)
 		else
-			self:move(i,item, scale, x , y)
+			self:move(i,item, scale, x , y,direction)
 		end
 	end
-	self:indexMove(direction)
 end
 function test:moveLeft()
 	--位置1的item变化position
@@ -260,22 +262,27 @@ end
 --@x,y  		 偏移量
 --@isCallBack    是否执行回调函数 
 --@scale         缩放值
-function test:move(index,item,scale,x,y,isCallBack)
+function test:move(index,item,scale,x,y,direction,isCallBack)
 	--print(""..index.."个".."scale:"..scale)
 	print("",index,item.index,scale)
-	if item == nil  then
-		return 
-	end
+	-- if item == nil  then
+	-- 	return 
+	-- end
 
 	local scale_ = cc.ScaleTo:create(0.5, scale)
 	local moveby_ = cc.MoveBy:create(0.5, cc.p(x, y))
 	
 	if isCallBack  == true then
 		local function setState()
+			print("=============callback")
 			self.state = FREE
 			self:orderReSet()
+			--一次移动表现完，当前item列表指向下标向左右移动
+			self:indexMove(direction)
+			print("=========当前指向",self.index)
+			print("=============direction",direction)
 		end
-		local seq = cc.Sequence:create(scale_,cc.DelayTime:create(0.01),cc.CallFunc:create(setState))
+		local seq = cc.Sequence:create(scale_,cc.DelayTime:create(0.1),cc.CallFunc:create(setState))
 		item:runAction(seq)
 	else
 		item:runAction(scale_)
@@ -292,13 +299,13 @@ function test:getScale_(index)
 	-- local S_2 = 0.9
 	-- local S_3 = 1
 	-- local S_4 = 0
-	if index == 1 or index == 7 then
+	if index == 6 or index == 0 then
 		return S_4
-	elseif index == 2 or index == 6 then
+	elseif index == 1 or index == 5 or index == -1 then
 		return S_1
-	elseif index == 3 or index == 5 then
+	elseif index == 2 or index == 4 then
 		return S_2
-	elseif index == 4 then
+	elseif index == 3 then
 		return S_3
 	end
 	return 0
@@ -328,13 +335,25 @@ function test:onTouchBegan(touch,event)
 	return true
 end
 function test:onTouchMoved(touch, event)
-	
+	local direction = self:checkDirection(self.touchBeginPosition, touch:getLocation())
+	--如果反转，下标恢复原位
+	-- if self.direction ~= direction and self.direction ~= -1 then
+	-- 	print("========change")
+	-- 	self:resetIndex(self.direction) 
+	-- end
+	self.direction = direction
+	if self.direction == DCENTER then
+		return
+	end
 	--判断方向
 	if self.state == FREE then
 		self.state = MOVING
-		
-		self:itemMove(self:checkDirection(self.touchBeginPosition, touch:getLocation()))
+		self:itemMove()
 	end
+end
+--复位
+function test:resetIndex(direction)
+	self.index = self.index + direction
 end
 function test:onTouchEnded(touch, event)
 	-- if self:isValid(touch:getLocation()) then
