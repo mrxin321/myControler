@@ -38,9 +38,8 @@ local function main()
     --测试
     local test = require("test.test2"):create()
     test:setPosition(cc.p(320,480))
-    test:test()
     --添加子item
-    for i=1,1 do 
+    for i=1,6 do 
         local str = string.format("book_%s.png",i)
         local item = ccui.Button:create(str,"","")
         item.index = i
